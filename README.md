@@ -40,7 +40,7 @@ type: module
 
 ## Configuration visuelle
 
-Ajoute la carte depuis le sélecteur de cartes du tableau de bord, puis utilise l’onglet visuel. Le champ **Enceintes** est automatiquement alimenté avec les entités `media_player` disponibles dans Home Assistant. L’éditeur permet aussi de régler le moteur TTS, les presets, l’historique, le mode presets uniquement et les principaux libellés.
+Ajoute la carte depuis le sélecteur de cartes du tableau de bord, puis utilise l’onglet visuel. Le champ **Enceintes** est automatiquement alimenté avec les entités `media_player` disponibles dans Home Assistant. L’éditeur permet aussi de régler le moteur TTS, les presets, l’historique et le mode presets uniquement.
 
 La configuration YAML reste disponible pour les usages avancés.
 
@@ -79,7 +79,7 @@ service_data:
   cache: true
 ```
 
-`tts_entity_id` doit correspondre à une entité disponible dans **Outils de développement > États**, par exemple `tts.home_assistant_cloud`.
+`tts_entity_id` peut correspondre à une entité disponible dans **Outils de développement > États**, par exemple `tts.home_assistant_cloud`. Si ce paramètre est vide avec `tts.speak`, la carte utilise automatiquement la première entité `tts.*` disponible.
 
 ## Ancien service TTS
 
@@ -102,7 +102,7 @@ Dans ce mode, `tts_entity_id` n’est pas utilisé.
 | --- | --- | --- |
 | `title` | vide | Titre de la carte |
 | `tts_service` | `tts.speak` | Action Home Assistant au format `domaine.service` |
-| `tts_entity_id` | vide | Entité `tts.*`, obligatoire avec `tts.speak` |
+| `tts_entity_id` | vide | Entité `tts.*` ; si vide avec `tts.speak`, la première entité disponible est utilisée |
 | `language` | vide | Langue transmise au moteur TTS |
 | `speakers` | `[]` | Liste des sorties `{ entity_id, label }` |
 | `presets` | `[]` | Liste des messages `{ label, text }` |

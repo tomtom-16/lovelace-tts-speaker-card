@@ -118,7 +118,7 @@ test('envoie le payload et la cible attendus avec tts.speak', async () => {
   ]);
 });
 
-test('refuse tts.speak sans entité TTS', async () => {
+test('refuse tts.speak si aucune entité TTS n’est configurée ou disponible', async () => {
   let called = false;
   const card = createCard({ tts_service: 'tts.speak' });
   card.hass = {
@@ -130,8 +130,37 @@ test('refuse tts.speak sans entité TTS', async () => {
   await card._sendText('Test');
 
   assert.equal(called, false);
-  assert.match(card._status.text, /tts_entity_id/);
+  assert.match(card._status.text, /Aucune entité TTS/);
   assert.equal(card._status.isError, true);
+});
+
+test('détecte automatiquement une entité TTS disponible', async () => {
+  const calls = [];
+  const card = createCard({ tts_service: 'tts.speak', tts_entity_id: '' });
+  card.hass = {
+    states: {
+      'tts.indisponible': { state: 'unavailable' },
+      'tts.google_translate_fr_com': { state: 'idle' },
+    },
+    callService(...args) {
+      calls.push(args);
+    },
+  };
+
+  await card._sendText('Bonjour');
+
+  assert.deepEqual(calls[0][3], { entity_id: 'tts.google_translate_fr_com' });
+});
+
+test('préfère l’entité TTS explicitement configurée', () => {
+  const card = createCard({ tts_entity_id: 'tts.piper' });
+  card.hass = {
+    states: {
+      'tts.google_translate_fr_com': { state: 'idle' },
+    },
+  };
+
+  assert.equal(card._getTtsEntityId(), 'tts.piper');
 });
 
 test('borne la taille de l’historique entre 1 et 100 entrées', () => {

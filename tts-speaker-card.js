@@ -186,6 +186,16 @@ class TtsSpeakerCard extends HTMLElement {
       service: match[2],
     };
   }
+  _getTtsEntityId() {
+    const configuredEntityId = String(this._config?.tts_entity_id || '').trim();
+    if (configuredEntityId) return configuredEntityId;
+    const candidates = Object.keys(this._hass?.states || {})
+      .filter((entityId) => entityId.startsWith('tts.'));
+    return candidates.find((entityId) => {
+      const state = this._hass.states[entityId]?.state;
+      return state !== 'unavailable' && state !== 'unknown';
+    }) || candidates[0] || '';
+  }
   _getSelectedSpeaker() {
     const speakers = this._getSpeakers();
     if (speakers.length === 1) return speakers[0].entity_id;
@@ -613,9 +623,9 @@ class TtsSpeakerCard extends HTMLElement {
       };
       let target;
       if (isModernTtsService) {
-        const ttsEntityId = String(this._config.tts_entity_id || '').trim();
+        const ttsEntityId = this._getTtsEntityId();
         if (!ttsEntityId) {
-          throw new Error('« tts_entity_id » est obligatoire avec le service tts.speak.');
+          throw new Error('Aucune entité TTS n’est configurée ou disponible dans Home Assistant.');
         }
         payload.media_player_entity_id = speakerEntityId;
         target = { entity_id: ttsEntityId };
@@ -714,16 +724,22 @@ class TtsSpeakerCardEditor extends HTMLElement {
     const presetsOnly = Boolean(this._config.presets_only);
     const presetRows = presets.map((preset, index) => `
       <div class="preset-row">
-        <ha-textfield data-preset-label="${index}" label="Nom du preset"></ha-textfield>
-        <ha-textfield data-preset-text="${index}" label="Texte à envoyer"></ha-textfield>
+        <label class="field">
+          <span>Nom du preset</span>
+          <input data-preset-label="${index}" type="text">
+        </label>
+        <label class="field">
+          <span>Texte à envoyer</span>
+          <textarea data-preset-text="${index}" rows="2"></textarea>
+        </label>
         <button class="icon-btn" data-remove-preset="${index}" type="button" title="Supprimer ce preset" aria-label="Supprimer ce preset">×</button>
       </div>
     `).join('');
     const speakerRows = speakers.map((speaker, index) => `
-      <ha-textfield
-        data-speaker-label="${index}"
-        label="Nom affiché pour ${this._escapeHtml(this._friendlyName(speaker.entity_id) || speaker.entity_id)}"
-      ></ha-textfield>
+      <label class="field">
+        <span>Nom affiché pour ${this._escapeHtml(this._friendlyName(speaker.entity_id) || speaker.entity_id)}</span>
+        <input data-speaker-label="${index}" type="text">
+      </label>
     `).join('');
 
     this.shadowRoot.innerHTML = `
@@ -750,18 +766,36 @@ class TtsSpeakerCardEditor extends HTMLElement {
           font-size: 1rem;
           margin: 8px 0 0;
         }
-        ha-textfield, ha-selector, textarea {
+        ha-selector, input, textarea {
           width: 100%;
         }
-        textarea {
+        input, textarea {
           box-sizing: border-box;
-          min-height: 80px;
-          padding: 10px;
+          min-height: 44px;
+          padding: 10px 12px;
           border: 1px solid var(--divider-color);
           border-radius: 8px;
           color: var(--primary-text-color);
           background: var(--card-background-color);
           font: inherit;
+        }
+        textarea {
+          resize: vertical;
+        }
+        .field {
+          display: grid;
+          gap: 6px;
+          min-width: 0;
+          font-size: 0.9rem;
+        }
+        .field > span {
+          font-weight: 500;
+        }
+        .tts-selector-row {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          align-items: center;
+          gap: 8px;
         }
         .switch-row {
           display: flex;
@@ -811,15 +845,22 @@ class TtsSpeakerCardEditor extends HTMLElement {
         @media (max-width: 600px) {
           .preset-row {
             grid-template-columns: 1fr auto;
+            align-items: start;
           }
-          .preset-row [data-preset-text] {
-            grid-column: 1 / -1;
-            grid-row: 2;
+          .preset-row .field {
+            grid-column: 1;
+          }
+          .preset-row .icon-btn {
+            grid-column: 2;
+            grid-row: 1 / span 2;
           }
         }
       </style>
       <div class="editor">
-        <ha-textfield id="title" label="Titre de la carte"></ha-textfield>
+        <label class="field">
+          <span>Titre de la carte</span>
+          <input id="title" type="text">
+        </label>
 
         <div class="section">
           <h3>Enceintes</h3>
@@ -830,10 +871,23 @@ class TtsSpeakerCardEditor extends HTMLElement {
 
         <div class="section">
           <h3>Text-to-Speech</h3>
+          <label class="field">
+            <span>Entité TTS</span>
+            <div class="tts-selector-row">
+              <ha-selector id="ttsEntitySelector"></ha-selector>
+              <button id="clearTtsEntity" type="button">Effacer</button>
+            </div>
+          </label>
+          <div class="helper">Facultatif : si ce champ est vide, la première entité TTS disponible est utilisée automatiquement.</div>
           <div class="grid">
-            <ha-textfield id="ttsService" label="Service TTS"></ha-textfield>
-            <ha-selector id="ttsEntitySelector"></ha-selector>
-            <ha-textfield id="language" label="Langue (facultatif)"></ha-textfield>
+            <label class="field">
+              <span>Service TTS</span>
+              <input id="ttsService" type="text">
+            </label>
+            <label class="field">
+              <span>Langue (facultatif)</span>
+              <input id="language" type="text">
+            </label>
           </div>
         </div>
 
@@ -861,10 +915,22 @@ class TtsSpeakerCardEditor extends HTMLElement {
               <ha-switch id="autoSelectFirstSpeaker"></ha-switch>
             </div>
             <div class="grid">
-              <ha-textfield id="historyMaxItems" label="Nombre maximal d’éléments" type="number" min="1" max="100"></ha-textfield>
-              <ha-textfield id="messagePlaceholder" label="Texte indicatif du champ"></ha-textfield>
-              <ha-textfield id="historyCheckboxLabel" label="Libellé de la mémorisation"></ha-textfield>
-              <ha-textfield id="historyStorageKey" label="Clé de stockage de l’historique"></ha-textfield>
+              <label class="field">
+                <span>Nombre maximal d’éléments</span>
+                <input id="historyMaxItems" type="number" min="1" max="100">
+              </label>
+              <label class="field">
+                <span>Texte indicatif du champ</span>
+                <input id="messagePlaceholder" type="text">
+              </label>
+              <label class="field">
+                <span>Libellé de la mémorisation</span>
+                <input id="historyCheckboxLabel" type="text">
+              </label>
+              <label class="field">
+                <span>Clé de stockage de l’historique</span>
+                <input id="historyStorageKey" type="text">
+              </label>
             </div>
           `}
         </div>
@@ -873,21 +939,6 @@ class TtsSpeakerCardEditor extends HTMLElement {
           <h3>Presets</h3>
           ${presetRows || '<div class="helper">Aucun preset configuré.</div>'}
           <button class="add-btn" id="addPreset" type="button">Ajouter un preset</button>
-        </div>
-
-        <div class="section">
-          <h3>Options avancées</h3>
-          <div class="grid">
-            <ha-textfield id="sendLabel" label="Libellé Envoyer"></ha-textfield>
-            <ha-textfield id="clearLabel" label="Libellé Effacer"></ha-textfield>
-            <ha-textfield id="speakerLabel" label="Libellé Enceinte"></ha-textfield>
-            <ha-textfield id="presetsLabel" label="Libellé des presets"></ha-textfield>
-            <ha-textfield id="historyLabel" label="Libellé de l’historique"></ha-textfield>
-            <ha-textfield id="statusTimeout" label="Durée du statut (ms)" type="number" min="0"></ha-textfield>
-          </div>
-          <label for="serviceData">Données de service supplémentaires (JSON)</label>
-          <textarea id="serviceData" spellcheck="false"></textarea>
-          <div id="serviceDataError" class="error" hidden>Le JSON des données de service est invalide.</div>
         </div>
       </div>
     `;
@@ -903,12 +954,6 @@ class TtsSpeakerCardEditor extends HTMLElement {
     setField('language', 'language');
     setField('messagePlaceholder', 'message_placeholder', DEFAULT_CONFIG.message_placeholder);
     setField('historyCheckboxLabel', 'history_checkbox_label', DEFAULT_CONFIG.history_checkbox_label);
-    setField('sendLabel', 'send_label', DEFAULT_CONFIG.send_label);
-    setField('clearLabel', 'clear_label', DEFAULT_CONFIG.clear_label);
-    setField('speakerLabel', 'speaker_label', DEFAULT_CONFIG.speaker_label);
-    setField('presetsLabel', 'presets_label', DEFAULT_CONFIG.presets_label);
-    setField('historyLabel', 'history_label', DEFAULT_CONFIG.history_label);
-    setField('statusTimeout', 'status_timeout_ms', DEFAULT_CONFIG.status_timeout_ms);
 
     const historyMaxItems = this.shadowRoot.querySelector('#historyMaxItems');
     if (historyMaxItems) {
@@ -975,10 +1020,13 @@ class TtsSpeakerCardEditor extends HTMLElement {
     const ttsEntitySelector = this.shadowRoot.querySelector('#ttsEntitySelector');
     ttsEntitySelector.hass = this._hass;
     ttsEntitySelector.selector = { entity: { filter: { domain: 'tts' } } };
-    ttsEntitySelector.label = 'Entité TTS';
+    ttsEntitySelector.required = false;
     ttsEntitySelector.value = this._config.tts_entity_id || '';
     ttsEntitySelector.addEventListener('value-changed', (ev) => {
       this._patch({ tts_entity_id: ev.detail?.value || '' });
+    });
+    this.shadowRoot.querySelector('#clearTtsEntity').addEventListener('click', () => {
+      this._patch({ tts_entity_id: '' }, true);
     });
 
     this.shadowRoot.querySelectorAll('[data-speaker-label]').forEach((field) => {
@@ -1020,19 +1068,6 @@ class TtsSpeakerCardEditor extends HTMLElement {
     });
     this.shadowRoot.querySelector('#addPreset').addEventListener('click', () => {
       this._patch({ presets: [...presets, { label: '', text: '' }] }, true);
-    });
-
-    const serviceData = this.shadowRoot.querySelector('#serviceData');
-    serviceData.value = JSON.stringify(this._config.service_data || {}, null, 2);
-    serviceData.addEventListener('change', (ev) => {
-      try {
-        const value = JSON.parse(ev.target.value || '{}');
-        if (!value || Array.isArray(value) || typeof value !== 'object') throw new Error('invalid');
-        this.shadowRoot.querySelector('#serviceDataError').hidden = true;
-        this._patch({ service_data: value });
-      } catch (_err) {
-        this.shadowRoot.querySelector('#serviceDataError').hidden = false;
-      }
     });
   }
 }
