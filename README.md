@@ -1,12 +1,19 @@
 # TTS Speaker Card
 
+<p align="center">
+  <img src="icon.png" alt="Icône TTS Speaker Card" width="160">
+</p>
+
 Carte Lovelace pour envoyer rapidement un texte vers une enceinte Home Assistant.
 
 ## Fonctionnalités
 
-- Sélection d’une enceinte configurée en YAML
+- Éditeur visuel intégré au tableau de bord Home Assistant
+- Sélection des enceintes depuis les entités `media_player` connues
+- Masquage automatique du sélecteur lorsqu’une seule enceinte est configurée
 - Compatibilité avec `tts.speak` et les anciens services TTS
 - Messages prédéfinis envoyés en un clic
+- Mode `presets_only` pour créer une carte composée uniquement de boutons
 - Historique local, dédupliqué et limité
 - Raccourci `Ctrl+Entrée` ou `Cmd+Entrée`
 - Libellés, langue et données de service personnalisables
@@ -31,6 +38,12 @@ url: /local/tts-speaker-card.js
 type: module
 ```
 
+## Configuration visuelle
+
+Ajoute la carte depuis le sélecteur de cartes du tableau de bord, puis utilise l’onglet visuel. Le champ **Enceintes** est automatiquement alimenté avec les entités `media_player` disponibles dans Home Assistant. L’éditeur permet aussi de régler le moteur TTS, les presets, l’historique, le mode presets uniquement et les principaux libellés.
+
+La configuration YAML reste disponible pour les usages avancés.
+
 ## Configuration recommandée
 
 L’action moderne `tts.speak` nécessite une entité TTS pour la voix et une ou plusieurs entités `media_player` pour la sortie :
@@ -53,6 +66,8 @@ presets:
     text: "Bonjour tout le monde"
   - label: Repas
     text: "Le repas est prêt"
+
+presets_only: false
 
 history:
   enabled: true
@@ -91,6 +106,7 @@ Dans ce mode, `tts_entity_id` n’est pas utilisé.
 | `language` | vide | Langue transmise au moteur TTS |
 | `speakers` | `[]` | Liste des sorties `{ entity_id, label }` |
 | `presets` | `[]` | Liste des messages `{ label, text }` |
+| `presets_only` | `false` | Masque la saisie et l’historique pour n’afficher que les presets |
 | `service_data` | `{}` | Données supplémentaires transmises à l’action |
 | `clear_after_send` | `true` | Efface le texte après un envoi réussi |
 | `auto_select_first_speaker` | `true` | Sélectionne automatiquement la première enceinte |
@@ -102,6 +118,22 @@ Dans ce mode, `tts_entity_id` n’est pas utilisé.
 | `history_label` | `Historique` | Titre de l’historique |
 | `presets_label` | `Messages rapides` | Titre des messages prédéfinis |
 | `history_checkbox_label` | `Mémoriser le message` | Libellé de la case d’historique |
+
+### Comportement selon le nombre d’enceintes
+
+- Sans enceinte, la carte affiche une erreur de configuration.
+- Avec une seule enceinte, celle-ci est utilisée directement et le sélecteur est masqué.
+- Avec plusieurs enceintes, le sélecteur reste affiché.
+
+### Mode presets uniquement
+
+Active **Afficher uniquement les presets** dans l’éditeur visuel ou ajoute :
+
+```yaml
+presets_only: true
+```
+
+Le champ texte, les boutons d’envoi/effacement et l’historique sont alors masqués. Avec un seul preset, la carte l’affiche comme un bouton principal pleine largeur. Le sélecteur d’enceinte n’apparaît que si plusieurs enceintes sont configurées.
 
 ### Historique
 

@@ -169,3 +169,58 @@ test('bloque les doubles envois tant que le premier est en cours', async () => {
   resolveCall();
   await firstSend;
 });
+
+test('affiche une erreur et masque les contrôles sans enceinte', () => {
+  const card = new TtsSpeakerCard();
+  card.setConfig({ speakers: [] });
+
+  assert.match(card.shadowRoot.innerHTML, /Aucune enceinte n’est configurée/);
+  assert.doesNotMatch(card.shadowRoot.innerHTML, /id="ttsText"/);
+});
+
+test('masque le sélecteur avec une enceinte et le conserve avec plusieurs', () => {
+  const singleSpeakerCard = createCard();
+  assert.doesNotMatch(singleSpeakerCard.shadowRoot.innerHTML, /id="speakerSelect"/);
+
+  const multipleSpeakersCard = createCard({
+    speakers: [
+      { entity_id: 'media_player.salon', label: 'Salon' },
+      { entity_id: 'media_player.cuisine', label: 'Cuisine' },
+    ],
+  });
+  assert.match(multipleSpeakersCard.shadowRoot.innerHTML, /id="speakerSelect"/);
+});
+
+test('le mode presets only masque la saisie et met en avant un preset unique', () => {
+  const card = createCard({
+    presets_only: true,
+    presets: [{ label: 'Repas', text: 'Le repas est prêt' }],
+  });
+
+  assert.doesNotMatch(card.shadowRoot.innerHTML, /id="ttsText"/);
+  assert.doesNotMatch(card.shadowRoot.innerHTML, /Historique/);
+  assert.match(card.shadowRoot.innerHTML, /single-preset/);
+});
+
+test('efface réellement le brouillon après un envoi réussi', async () => {
+  const card = createCard({
+    tts_service: 'tts.google_translate_say',
+    clear_after_send: true,
+  });
+  card._draftText = 'Texte à effacer';
+  card.hass = { callService() {} };
+
+  await card._sendText(card._draftText);
+
+  assert.equal(card._draftText, '');
+});
+
+test('accepte aussi les identifiants d’enceintes issus de l’éditeur visuel', () => {
+  const card = createCard({ speakers: ['media_player.bureau'] });
+  assert.deepEqual(card._getSpeakers(), [{ entity_id: 'media_player.bureau', label: '' }]);
+  assert.equal(card._getSelectedSpeaker(), 'media_player.bureau');
+});
+
+test('enregistre un éditeur visuel pour la carte', () => {
+  assert.ok(registeredElements.get('tts-speaker-card-editor'));
+});
