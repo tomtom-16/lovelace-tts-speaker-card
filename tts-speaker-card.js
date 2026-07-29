@@ -2,7 +2,8 @@
 /* global customElements, HTMLElement, window */
 const DEFAULT_CONFIG = {
   title: '',
-  tts_service: 'tts.google_translate_say',
+  tts_service: 'tts.speak',
+  tts_entity_id: '',
   language: '',
   speakers: [],
   presets: [],
@@ -36,6 +37,7 @@ class TtsSpeakerCard extends HTMLElement {
     this._memorizeMessage = true;
     this._status = { text: '', isError: false };
     this._statusTimer = null;
+    this._isSending = false;
   }
   setConfig(config) {
     if (!config || typeof config !== 'object') {
@@ -64,6 +66,12 @@ class TtsSpeakerCard extends HTMLElement {
   connectedCallback() {
     if (this._config && !this.shadowRoot.innerHTML) {
       this._render();
+    }
+  }
+  disconnectedCallback() {
+    if (this._statusTimer) {
+      clearTimeout(this._statusTimer);
+      this._statusTimer = null;
     }
   }
   getCardSize() {
@@ -103,7 +111,7 @@ class TtsSpeakerCard extends HTMLElement {
       if (!Array.isArray(parsed)) return [];
       return parsed
         .filter((item) => item && typeof item.text === 'string')
-        .slice(0, this._config?.history?.max_items || 20);
+        .slice(0, this._getHistoryLimit());
     } catch (_err) {
       return [];
     }
@@ -122,24 +130,29 @@ class TtsSpeakerCard extends HTMLElement {
     this._history = [
       { text: cleaned, ts: Date.now() },
       ...this._history.filter((item) => item.text !== cleaned),
-    ].slice(0, this._config.history.max_items || 20);
+    ].slice(0, this._getHistoryLimit());
     this._saveHistory();
   }
   _deleteHistoryEntry(index) {
-    if (!this._config?.history?.enabled) return;
+    if (!this._config?.history?.enabled || !Number.isInteger(index) || index < 0 || index >= this._history.length) return;
     this._history.splice(index, 1);
     this._saveHistory();
     this._render();
   }
+  _getHistoryLimit() {
+    const configuredLimit = Number(this._config?.history?.max_items);
+    if (!Number.isFinite(configuredLimit)) return DEFAULT_CONFIG.history.max_items;
+    return Math.min(100, Math.max(1, Math.trunc(configuredLimit)));
+  }
   _parseService(fullService) {
-    const service = String(fullService || 'tts.google_translate_say').trim();
-    const parts = service.split('.');
-    if (parts.length < 2) {
-      return { domain: 'tts', service: 'google_translate_say' };
+    const fullName = String(fullService || DEFAULT_CONFIG.tts_service).trim();
+    const match = /^([a-z0-9_]+)\.([a-z0-9_]+)$/.exec(fullName);
+    if (!match) {
+      throw new Error(`Service TTS invalide : « ${fullName} ». Le format attendu est domaine.service.`);
     }
     return {
-      domain: parts[0],
-      service: parts.slice(1).join('.'),
+      domain: match[1],
+      service: match[2],
     };
   }
   _getSelectedSpeaker() {
@@ -164,8 +177,9 @@ class TtsSpeakerCard extends HTMLElement {
     }
     this._status = { text: String(message || ''), isError };
     this._render();
-    const timeout = Number(this._config?.status_timeout_ms || DEFAULT_CONFIG.status_timeout_ms);
-    if (timeout > 0) {
+    const configuredTimeout = Number(this._config?.status_timeout_ms);
+    const timeout = Number.isFinite(configuredTimeout) ? configuredTimeout : DEFAULT_CONFIG.status_timeout_ms;
+    if (timeout > 0 && this.isConnected) {
       this._statusTimer = window.setTimeout(() => {
         this._status = { text: '', isError: false };
         this._statusTimer = null;
@@ -187,20 +201,26 @@ class TtsSpeakerCard extends HTMLElement {
     const existingText = this.shadowRoot.querySelector('#ttsText')?.value ?? this._draftText ?? '';
     const existingSpeaker = this.shadowRoot.querySelector('#speakerSelect')?.value ?? this._selectedSpeaker ?? '';
     const existingMemorize = this.shadowRoot.querySelector('#memorizeCheckbox')?.checked ?? this._memorizeMessage ?? true;
-    const speakers = Array.isArray(this._config.speakers) ? this._config.speakers : [];
+    const speakers = Array.isArray(this._config.speakers)
+      ? this._config.speakers.filter((speaker) => typeof speaker?.entity_id === 'string' && speaker.entity_id.trim())
+      : [];
     const presets = Array.isArray(this._config.presets) ? this._config.presets : [];
     const historyEnabled = Boolean(this._config.history?.enabled);
     const allowDelete = Boolean(this._config.history?.allow_delete);
     const hasSpeakers = speakers.length > 0;
     const hasPresets = presets.length > 0;
     const hasHistory = historyEnabled && this._history.length > 0;
-    const speakerOptions = speakers
+    const hasSelectedSpeaker = speakers.some((speaker) => speaker.entity_id.trim() === existingSpeaker);
+    const emptySpeakerOption = !this._config.auto_select_first_speaker
+      ? '<option value="">Sélectionner une enceinte</option>'
+      : '';
+    const speakerOptions = emptySpeakerOption + speakers
       .map((speaker, index) => {
-        const entityId = speaker?.entity_id || '';
+        const entityId = speaker.entity_id.trim();
         const label = speaker?.label || entityId || `Enceinte ${index + 1}`;
         const shouldSelect =
-          (existingSpeaker && entityId === existingSpeaker) ||
-          (!existingSpeaker && this._config.auto_select_first_speaker && index === 0);
+          (hasSelectedSpeaker && entityId === existingSpeaker) ||
+          (!hasSelectedSpeaker && this._config.auto_select_first_speaker && index === 0);
         return `<option value="${this._escapeHtml(entityId)}" ${shouldSelect ? 'selected' : ''}>${this._escapeHtml(label)}</option>`;
       })
       .join('');
@@ -312,6 +332,11 @@ class TtsSpeakerCard extends HTMLElement {
         .send-btn:active, .clear-btn:active, .preset-btn:active, .history-delete:active, .history-item:active {
           transform: scale(0.99);
         }
+        button:disabled {
+          cursor: wait;
+          opacity: 0.6;
+          transform: none;
+        }
         .preset-grid {
           display: grid;
           grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
@@ -415,14 +440,14 @@ class TtsSpeakerCard extends HTMLElement {
               <input id="memorizeCheckbox" type="checkbox" ${existingMemorize ? 'checked' : ''} ${historyEnabled ? '' : 'disabled'} />
               <label for="memorizeCheckbox">${this._escapeHtml(this._config.history_checkbox_label || 'Mémoriser le message')}</label>
             </div>
-            <div class="hint">Le texte envoyé sera effacé après un envoi réussi.</div>
+            ${this._config.clear_after_send ? '<div class="hint">Le texte envoyé sera effacé après un envoi réussi.</div>' : ''}
           </div>
           <div class="section row">
-            <button class="send-btn" id="sendBtn" type="button">${this._escapeHtml(this._config.send_label)}</button>
+            <button class="send-btn" id="sendBtn" type="button" ${this._isSending ? 'disabled aria-busy="true"' : ''}>${this._escapeHtml(this._config.send_label)}</button>
             <button class="clear-btn" id="clearBtn" type="button">${this._escapeHtml(this._config.clear_label)}</button>
             <div></div>
           </div>
-          ${this._status.text ? `<div class="section ${this._status.isError ? 'error' : 'success'}">${this._escapeHtml(this._status.text)}</div>` : ''}
+          ${this._status.text ? `<div class="section ${this._status.isError ? 'error' : 'success'}" role="${this._status.isError ? 'alert' : 'status'}" aria-live="polite">${this._escapeHtml(this._status.text)}</div>` : ''}
           ${hasPresets ? `
             <div class="section">
               <label class="label">${this._escapeHtml(this._config.presets_label || 'Messages rapides')}</label>
@@ -460,7 +485,7 @@ class TtsSpeakerCard extends HTMLElement {
       };
     }
     if (speakerSelect) {
-      if (existingSpeaker) {
+      if (hasSelectedSpeaker) {
         speakerSelect.value = existingSpeaker;
       }
       this._selectedSpeaker = speakerSelect.value || existingSpeaker || '';
@@ -512,34 +537,54 @@ class TtsSpeakerCard extends HTMLElement {
     await this._sendText(text);
   }
   async _sendText(text) {
+    if (this._isSending) return;
     const cleanedText = String(text || '').trim();
     if (!cleanedText) {
       this._setStatus('Le texte est vide.');
       return;
     }
-    const speakers = Array.isArray(this._config.speakers) ? this._config.speakers : [];
+    const speakers = Array.isArray(this._config.speakers)
+      ? this._config.speakers.filter((speaker) => typeof speaker?.entity_id === 'string' && speaker.entity_id.trim())
+      : [];
     if (speakers.length === 0) {
       this._setStatus('Aucune enceinte n’est configurée.');
       return;
     }
     const selectedSpeaker = this._getSelectedSpeaker();
-    const speaker = speakers.find((item) => item?.entity_id === selectedSpeaker) || speakers[0];
-    const speakerEntityId = speaker?.entity_id;
+    const speaker = speakers.find((item) => item.entity_id.trim() === selectedSpeaker);
+    const speakerEntityId = speaker?.entity_id.trim();
     if (!speakerEntityId) {
       this._setStatus('L’enceinte sélectionnée n’est pas valide.');
       return;
     }
+    if (!this._hass || typeof this._hass.callService !== 'function') {
+      this._setStatus('Home Assistant n’est pas encore prêt. Réessaie dans un instant.');
+      return;
+    }
+    this._isSending = true;
+    this._render();
     try {
       const { domain, service } = this._parseService(this._config.tts_service);
+      const isModernTtsService = domain === 'tts' && service === 'speak';
       const payload = {
-        entity_id: speakerEntityId,
-        message: cleanedText,
         ...this._config.service_data,
+        message: cleanedText,
       };
+      let target;
+      if (isModernTtsService) {
+        const ttsEntityId = String(this._config.tts_entity_id || '').trim();
+        if (!ttsEntityId) {
+          throw new Error('« tts_entity_id » est obligatoire avec le service tts.speak.');
+        }
+        payload.media_player_entity_id = speakerEntityId;
+        target = { entity_id: ttsEntityId };
+      } else {
+        payload.entity_id = speakerEntityId;
+      }
       if (this._config.language) {
         payload.language = this._config.language;
       }
-      await this._hass.callService(domain, service, payload);
+      await this._hass.callService(domain, service, payload, target);
       if (this._memorizeMessage) {
         this._addToHistory(cleanedText);
       }
@@ -547,10 +592,12 @@ class TtsSpeakerCard extends HTMLElement {
         this._draftText = '';
       }
       this._setStatus(`Envoyé vers ${speaker.label || speakerEntityId}.`, false);
-      this._render();
     } catch (err) {
       const message = err?.message || String(err) || 'Erreur inconnue';
       this._setStatus(`Erreur lors de l’envoi : ${message}`);
+    } finally {
+      this._isSending = false;
+      this._render();
     }
   }
 }
@@ -558,8 +605,12 @@ if (!customElements.get('tts-speaker-card')) {
   customElements.define('tts-speaker-card', TtsSpeakerCard);
 }
 window.customCards = window.customCards || [];
-window.customCards.push({
-  type: 'tts-speaker-card',
-  name: 'TTS Speaker Card',
-  description: 'Envoie un texte TTS vers une enceinte Home Assistant choisie.',
-});
+if (!window.customCards.some((card) => card.type === 'tts-speaker-card')) {
+  window.customCards.push({
+    type: 'tts-speaker-card',
+    name: 'TTS Speaker Card',
+    description: 'Envoie un texte TTS vers une enceinte Home Assistant choisie.',
+  });
+}
+
+export { TtsSpeakerCard };

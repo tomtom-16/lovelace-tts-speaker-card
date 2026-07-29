@@ -1,5 +1,6 @@
 {
   "name": "TTS Speaker Card",
   "content_in_root": true,
-  "filename": "tts-speaker-card.js"
+  "filename": "tts-speaker-card.js",
+  "render_readme": true
 }
