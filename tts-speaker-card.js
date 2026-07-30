@@ -536,11 +536,16 @@ class TtsSpeakerCard extends HTMLElement {
         this._draftText = ev.target.value;
       };
       textarea.onkeydown = (ev) => {
+        // Empêche les raccourcis globaux de Home Assistant (dont Assist) de
+        // s'activer pendant la saisie dans la carte.
+        ev.stopPropagation();
         if ((ev.ctrlKey || ev.metaKey) && ev.key === 'Enter') {
           ev.preventDefault();
           this._onSend();
         }
       };
+      textarea.onkeyup = (ev) => ev.stopPropagation();
+      textarea.onkeypress = (ev) => ev.stopPropagation();
     }
     if (speakerSelect) {
       if (hasSelectedSpeaker) {
