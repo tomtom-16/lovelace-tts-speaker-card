@@ -40,9 +40,9 @@ type: module
 
 ## Configuration visuelle
 
-Ajoute la carte depuis le sélecteur de cartes du tableau de bord, puis utilise l’onglet visuel. Le champ **Enceintes** est automatiquement alimenté avec les entités `media_player` disponibles dans Home Assistant. L’éditeur permet aussi de régler le moteur TTS, les presets, l’historique et le mode presets uniquement.
+Ajoute la carte depuis le sélecteur de cartes du tableau de bord, puis utilise l’onglet visuel. Le champ **Enceintes** est automatiquement alimenté avec les entités `media_player` disponibles dans Home Assistant. L’éditeur permet aussi de régler la langue, les presets, l’historique et le mode presets uniquement.
 
-La configuration YAML reste disponible pour les usages avancés.
+La configuration YAML reste disponible pour les usages avancés. Les paramètres techniques `tts_service` et `tts_entity_id`, ainsi que les options de personnalisation `message_placeholder`, `history_checkbox_label` et `history.storage_key`, sont volontairement disponibles uniquement dans l’éditeur YAML.
 
 ## Configuration recommandée
 
@@ -101,8 +101,8 @@ Dans ce mode, `tts_entity_id` n’est pas utilisé.
 | Paramètre | Défaut | Description |
 | --- | --- | --- |
 | `title` | vide | Titre de la carte |
-| `tts_service` | `tts.speak` | Action Home Assistant au format `domaine.service` |
-| `tts_entity_id` | vide | Entité `tts.*` ; si vide avec `tts.speak`, la première entité disponible est utilisée |
+| `tts_service` | `tts.speak` | Action Home Assistant au format `domaine.service` (YAML uniquement) |
+| `tts_entity_id` | vide | Entité `tts.*` ; si vide avec `tts.speak`, la première entité disponible est utilisée (YAML uniquement) |
 | `language` | vide | Langue transmise au moteur TTS |
 | `speakers` | `[]` | Liste des sorties `{ entity_id, label }` |
 | `presets` | `[]` | Liste des messages `{ label, text }` |
@@ -111,13 +111,13 @@ Dans ce mode, `tts_entity_id` n’est pas utilisé.
 | `clear_after_send` | `true` | Efface le texte après un envoi réussi |
 | `auto_select_first_speaker` | `true` | Sélectionne automatiquement la première enceinte |
 | `status_timeout_ms` | `5000` | Durée d’affichage du statut ; `0` le conserve |
-| `message_placeholder` | `Saisis ton texte ici…` | Texte indicatif du champ |
+| `message_placeholder` | `Saisis ton texte ici…` | Texte indicatif du champ (YAML uniquement) |
 | `send_label` | `Envoyer` | Libellé du bouton d’envoi |
 | `clear_label` | `Effacer` | Libellé du bouton d’effacement |
 | `speaker_label` | `Enceinte` | Libellé de la liste des enceintes |
 | `history_label` | `Historique` | Titre de l’historique |
 | `presets_label` | `Messages rapides` | Titre des messages prédéfinis |
-| `history_checkbox_label` | `Mémoriser le message` | Libellé de la case d’historique |
+| `history_checkbox_label` | `Mémoriser le message` | Libellé de la case d’historique (YAML uniquement) |
 
 ### Comportement selon le nombre d’enceintes
 
@@ -150,7 +150,8 @@ history:
 - `enabled` active l’historique.
 - `max_items` fixe le nombre maximal d’entrées.
 - `allow_delete` affiche les boutons de suppression.
-- `storage_key` permet de partager ou séparer l’historique entre plusieurs cartes.
+- `storage_key` permet de partager ou séparer l’historique entre plusieurs cartes (YAML uniquement).
+- Cliquer sur un message de l’historique l’envoie immédiatement vers l’enceinte sélectionnée, comme un preset.
 
 ## Développement
 

@@ -220,6 +220,14 @@ test('masque le sélecteur avec une enceinte et le conserve avec plusieurs', () 
   assert.match(multipleSpeakersCard.shadowRoot.innerHTML, /id="speakerSelect"/);
 });
 
+test('supprime l’espacement réservé au titre lorsque celui-ci est vide', () => {
+  const cardWithoutTitle = createCard();
+  const cardWithTitle = createCard({ title: 'Annonce' });
+
+  assert.doesNotMatch(cardWithoutTitle.shadowRoot.innerHTML, /<div class="header">/);
+  assert.match(cardWithTitle.shadowRoot.innerHTML, /<div class="header">/);
+});
+
 test('le mode presets only masque la saisie et met en avant un preset unique', () => {
   const card = createCard({
     presets_only: true,
@@ -242,6 +250,22 @@ test('efface réellement le brouillon après un envoi réussi', async () => {
   await card._sendText(card._draftText);
 
   assert.equal(card._draftText, '');
+});
+
+test('envoie immédiatement un message sélectionné dans l’historique', async () => {
+  const calls = [];
+  const card = createCard({
+    tts_service: 'tts.google_translate_say',
+    clear_after_send: false,
+  });
+  card._history = [{ text: 'Message de l’historique', ts: Date.now() }];
+  card.hass = { callService(...args) { calls.push(args); } };
+
+  await card._sendHistoryItem(0);
+
+  assert.equal(card._draftText, 'Message de l’historique');
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][2].message, 'Message de l’historique');
 });
 
 test('accepte aussi les identifiants d’enceintes issus de l’éditeur visuel', () => {

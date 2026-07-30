@@ -471,9 +471,11 @@ class TtsSpeakerCard extends HTMLElement {
         }
       </style>
       <ha-card>
-        <div class="header">
-          ${this._config.title ? `<div class="title">${this._escapeHtml(this._config.title)}</div>` : ''}
-        </div>
+        ${this._config.title ? `
+          <div class="header">
+            <div class="title">${this._escapeHtml(this._config.title)}</div>
+          </div>
+        ` : ''}
         <div class="split">
           ${!hasSpeakers ? `
             <div class="error" role="alert">Aucune enceinte n’est configurée dans la carte.</div>
@@ -571,11 +573,9 @@ class TtsSpeakerCard extends HTMLElement {
       });
     });
     this.shadowRoot.querySelectorAll('[data-history-index]').forEach((btn) => {
-      btn.addEventListener('click', (ev) => {
+      btn.addEventListener('click', async (ev) => {
         const index = Number(ev.currentTarget?.getAttribute('data-history-index'));
-        const item = this._history[index];
-        if (!item) return;
-        this._setTextValue(item.text);
+        await this._sendHistoryItem(index);
       });
     });
     this.shadowRoot.querySelectorAll('[data-delete-history-index]').forEach((btn) => {
@@ -588,6 +588,12 @@ class TtsSpeakerCard extends HTMLElement {
   async _onSend() {
     const text = this._getTextValue().trim();
     await this._sendText(text);
+  }
+  async _sendHistoryItem(index) {
+    const item = this._history[index];
+    if (!item) return;
+    this._setTextValue(item.text);
+    await this._sendText(item.text);
   }
   async _sendText(text) {
     if (this._isSending) return;
@@ -791,12 +797,6 @@ class TtsSpeakerCardEditor extends HTMLElement {
         .field > span {
           font-weight: 500;
         }
-        .tts-selector-row {
-          display: grid;
-          grid-template-columns: minmax(0, 1fr) auto;
-          align-items: center;
-          gap: 8px;
-        }
         .switch-row {
           display: flex;
           justify-content: space-between;
@@ -872,23 +872,9 @@ class TtsSpeakerCardEditor extends HTMLElement {
         <div class="section">
           <h3>Text-to-Speech</h3>
           <label class="field">
-            <span>Entité TTS</span>
-            <div class="tts-selector-row">
-              <ha-selector id="ttsEntitySelector"></ha-selector>
-              <button id="clearTtsEntity" type="button">Effacer</button>
-            </div>
+            <span>Langue (facultatif)</span>
+            <input id="language" type="text">
           </label>
-          <div class="helper">Facultatif : si ce champ est vide, la première entité TTS disponible est utilisée automatiquement.</div>
-          <div class="grid">
-            <label class="field">
-              <span>Service TTS</span>
-              <input id="ttsService" type="text">
-            </label>
-            <label class="field">
-              <span>Langue (facultatif)</span>
-              <input id="language" type="text">
-            </label>
-          </div>
         </div>
 
         <div class="section">
@@ -919,18 +905,6 @@ class TtsSpeakerCardEditor extends HTMLElement {
                 <span>Nombre maximal d’éléments</span>
                 <input id="historyMaxItems" type="number" min="1" max="100">
               </label>
-              <label class="field">
-                <span>Texte indicatif du champ</span>
-                <input id="messagePlaceholder" type="text">
-              </label>
-              <label class="field">
-                <span>Libellé de la mémorisation</span>
-                <input id="historyCheckboxLabel" type="text">
-              </label>
-              <label class="field">
-                <span>Clé de stockage de l’historique</span>
-                <input id="historyStorageKey" type="text">
-              </label>
             </div>
           `}
         </div>
@@ -950,10 +924,7 @@ class TtsSpeakerCardEditor extends HTMLElement {
       field.addEventListener('change', (ev) => this._patch({ [configKey]: ev.target.value }));
     };
     setField('title', 'title');
-    setField('ttsService', 'tts_service', DEFAULT_CONFIG.tts_service);
     setField('language', 'language');
-    setField('messagePlaceholder', 'message_placeholder', DEFAULT_CONFIG.message_placeholder);
-    setField('historyCheckboxLabel', 'history_checkbox_label', DEFAULT_CONFIG.history_checkbox_label);
 
     const historyMaxItems = this.shadowRoot.querySelector('#historyMaxItems');
     if (historyMaxItems) {
@@ -986,19 +957,6 @@ class TtsSpeakerCardEditor extends HTMLElement {
       (value) => this._patch({ auto_select_first_speaker: value }),
     );
 
-    const historyStorageKey = this.shadowRoot.querySelector('#historyStorageKey');
-    if (historyStorageKey) {
-      historyStorageKey.value = this._config.history.storage_key || '';
-      historyStorageKey.addEventListener('change', (ev) => {
-        this._patch({
-          history: {
-            ...this._config.history,
-            storage_key: ev.target.value || null,
-          },
-        });
-      });
-    }
-
     const speakersSelector = this.shadowRoot.querySelector('#speakersSelector');
     speakersSelector.hass = this._hass;
     speakersSelector.selector = {
@@ -1015,18 +973,6 @@ class TtsSpeakerCardEditor extends HTMLElement {
         return existing || { entity_id: entityId, label: this._friendlyName(entityId) };
       });
       this._patch({ speakers: nextSpeakers }, true);
-    });
-
-    const ttsEntitySelector = this.shadowRoot.querySelector('#ttsEntitySelector');
-    ttsEntitySelector.hass = this._hass;
-    ttsEntitySelector.selector = { entity: { filter: { domain: 'tts' } } };
-    ttsEntitySelector.required = false;
-    ttsEntitySelector.value = this._config.tts_entity_id || '';
-    ttsEntitySelector.addEventListener('value-changed', (ev) => {
-      this._patch({ tts_entity_id: ev.detail?.value || '' });
-    });
-    this.shadowRoot.querySelector('#clearTtsEntity').addEventListener('click', () => {
-      this._patch({ tts_entity_id: '' }, true);
     });
 
     this.shadowRoot.querySelectorAll('[data-speaker-label]').forEach((field) => {
