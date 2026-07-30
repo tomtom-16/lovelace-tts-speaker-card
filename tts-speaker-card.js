@@ -316,6 +316,9 @@ class TtsSpeakerCard extends HTMLElement {
         .section {
           margin-top: 14px;
         }
+        .split > .section:first-child {
+          margin-top: 0;
+        }
         .label {
           display: block;
           margin-bottom: 6px;
