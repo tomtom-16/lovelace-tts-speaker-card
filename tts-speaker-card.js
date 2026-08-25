@@ -5,6 +5,7 @@ const DEFAULT_CONFIG = {
   tts_service: 'tts.speak',
   tts_entity_id: '',
   language: '',
+  tts_prefix: '',
   speakers: [],
   presets: [],
   presets_only: false,
@@ -631,9 +632,12 @@ class TtsSpeakerCard extends HTMLElement {
     try {
       const { domain, service } = this._parseService(this._config.tts_service);
       const isModernTtsService = domain === 'tts' && service === 'speak';
+      const ttsPrefix = typeof this._config.tts_prefix === 'string'
+        ? this._config.tts_prefix
+        : '';
       const payload = {
         ...this._config.service_data,
-        message: cleanedText,
+        message: `${ttsPrefix}${cleanedText}`,
       };
       let target;
       if (isModernTtsService) {

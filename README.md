@@ -17,6 +17,7 @@ Carte Lovelace pour envoyer rapidement un texte vers une enceinte Home Assistant
 - Historique local, dédupliqué et limité
 - Raccourci `Ctrl+Entrée` ou `Cmd+Entrée`
 - Libellés, langue et données de service personnalisables
+- Préfixe TTS optionnel pour ajouter automatiquement une pause ou un texte avant chaque message
 
 ## Installation
 
@@ -42,7 +43,7 @@ type: module
 
 Ajoute la carte depuis le sélecteur de cartes du tableau de bord, puis utilise l’onglet visuel. Le champ **Enceintes** est automatiquement alimenté avec les entités `media_player` disponibles dans Home Assistant. L’éditeur permet aussi de régler la langue, les presets, l’historique et le mode presets uniquement.
 
-La configuration YAML reste disponible pour les usages avancés. Les paramètres techniques `tts_service` et `tts_entity_id`, ainsi que les options de personnalisation `message_placeholder`, `history_checkbox_label` et `history.storage_key`, sont volontairement disponibles uniquement dans l’éditeur YAML.
+La configuration YAML reste disponible pour les usages avancés. Les paramètres techniques `tts_service`, `tts_entity_id` et `tts_prefix`, ainsi que les options de personnalisation `message_placeholder`, `history_checkbox_label` et `history.storage_key`, sont volontairement disponibles uniquement dans l’éditeur YAML.
 
 ## Configuration recommandée
 
@@ -54,6 +55,7 @@ title: TTS rapide
 tts_service: tts.speak
 tts_entity_id: tts.home_assistant_cloud
 language: fr-FR
+tts_prefix: "… … "
 
 speakers:
   - entity_id: media_player.salon
@@ -81,6 +83,12 @@ service_data:
 
 `tts_entity_id` peut correspondre à une entité disponible dans **Outils de développement > États**, par exemple `tts.home_assistant_cloud`. Si ce paramètre est vide avec `tts.speak`, la carte utilise automatiquement la première entité `tts.*` disponible.
 
+`tts_prefix` permet d’ajouter automatiquement un préfixe devant chaque message envoyé au moteur TTS. Si ce paramètre est absent ou vide, aucun préfixe n’est ajouté.
+Cette option peut notamment être utile avec certaines enceintes qui nécessitent un court délai pour initialiser leur sortie audio. Par exemple :
+```yaml
+tts_prefix: "… … "
+```
+
 ## Ancien service TTS
 
 Les services historiques qui prennent directement le lecteur multimédia dans `entity_id` restent pris en charge :
@@ -104,6 +112,7 @@ Dans ce mode, `tts_entity_id` n’est pas utilisé.
 | `tts_service` | `tts.speak` | Action Home Assistant au format `domaine.service` (YAML uniquement) |
 | `tts_entity_id` | vide | Entité `tts.*` ; si vide avec `tts.speak`, la première entité disponible est utilisée (YAML uniquement) |
 | `language` | vide | Langue transmise au moteur TTS |
+| `tts_prefix` | vide | Préfixe ajouté automatiquement devant chaque message TTS (YAML uniquement) |
 | `speakers` | `[]` | Liste des sorties `{ entity_id, label }` |
 | `presets` | `[]` | Liste des messages `{ label, text }` |
 | `presets_only` | `false` | Masque la saisie et l’historique pour n’afficher que les presets |
