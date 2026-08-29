@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "check": "node --check tts-speaker-card.js",
-    "test": "node --test"
+    "test": "node --test",
+    "preview": "node serve-preview.mjs"
   }
 }
