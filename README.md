@@ -126,7 +126,7 @@ Dans ce mode, `tts_entity_id` n’est pas utilisé.
 | `speaker_label` | `Enceinte` | Libellé de la liste des enceintes |
 | `history_label` | `Historique` | Titre de l’historique |
 | `presets_label` | `Messages rapides` | Titre des messages prédéfinis |
-| `history_checkbox_label` | `Mémoriser le message` | Libellé de la case d’historique (YAML uniquement) |
+| `history_checkbox_label` | `Historiser` | Libellé de la case d’historique (YAML uniquement) |
 
 ### Comportement selon le nombre d’enceintes
 

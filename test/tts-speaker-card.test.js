@@ -266,6 +266,22 @@ test('le mode presets only masque la saisie et met en avant un preset unique', (
   assert.match(card.shadowRoot.innerHTML, /single-preset/);
 });
 
+test('affiche le statut sous les boutons en mode presets only', async () => {
+  const card = createCard({
+    presets_only: true,
+    presets: [{ label: 'Repas', text: 'Le repas est prêt' }],
+    tts_service: 'tts.google_translate_say',
+  });
+  card.hass = { callService() {} };
+
+  await card._sendText('Le repas est prêt');
+
+  const html = card.shadowRoot.innerHTML;
+  const presetPosition = html.indexOf('data-preset-text=');
+  const statusPosition = html.indexOf('class="status status-success"');
+  assert.ok(statusPosition > presetPosition);
+});
+
 test('efface réellement le brouillon après un envoi réussi', async () => {
   const card = createCard({
     tts_service: 'tts.google_translate_say',
@@ -277,6 +293,25 @@ test('efface réellement le brouillon après un envoi réussi', async () => {
   await card._sendText(card._draftText);
 
   assert.equal(card._draftText, '');
+});
+
+test('affiche Historiser et le statut sans fond à côté du libellé', async () => {
+  const card = createCard({
+    tts_service: 'tts.google_translate_say',
+  });
+  card.hass = { callService() {} };
+
+  assert.match(card.shadowRoot.innerHTML, /<label for="memorizeCheckbox">Historiser<\/label>/);
+  assert.doesNotMatch(card.shadowRoot.innerHTML, /Mémoriser le message/);
+  assert.match(card.shadowRoot.innerHTML, /grid-template-columns: minmax\(0, 1fr\) auto/);
+  assert.match(card.shadowRoot.innerHTML, /\.checkbox-row \.status \{[\s\S]*position: absolute;[\s\S]*right: 0;[\s\S]*text-align: right;/);
+
+  await card._sendText('Bonjour');
+
+  assert.match(card.shadowRoot.innerHTML, /<label for="memorizeCheckbox">Historiser<\/label>\s*<span class="status status-success"/);
+  assert.match(card.shadowRoot.innerHTML, /Envoyé vers Salon/);
+  assert.doesNotMatch(card._status.text, /\.$/);
+  assert.doesNotMatch(card.shadowRoot.innerHTML, /<div class="section success"/);
 });
 
 test('envoie immédiatement un message sélectionné dans l’historique', async () => {

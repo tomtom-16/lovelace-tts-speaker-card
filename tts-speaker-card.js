@@ -21,7 +21,7 @@ const DEFAULT_CONFIG = {
   speaker_label: 'Enceinte',
   history_label: 'Historique',
   presets_label: 'Messages rapides',
-  history_checkbox_label: 'Mémoriser le message',
+  history_checkbox_label: 'Historiser',
   clear_after_send: true,
   auto_select_first_speaker: true,
   service_data: {},
@@ -221,7 +221,8 @@ class TtsSpeakerCard extends HTMLElement {
       clearTimeout(this._statusTimer);
       this._statusTimer = null;
     }
-    this._status = { text: String(message || ''), isError };
+    const statusText = String(message || '').replace(/\.+\s*$/, '');
+    this._status = { text: statusText, isError };
     this._render();
     const configuredTimeout = Number(this._config?.status_timeout_ms);
     const timeout = Number.isFinite(configuredTimeout) ? configuredTimeout : DEFAULT_CONFIG.status_timeout_ms;
@@ -310,6 +311,9 @@ class TtsSpeakerCard extends HTMLElement {
         `;
       })
       .join('');
+    const statusMarkup = this._status.text
+      ? `<span class="status ${this._status.isError ? 'status-error' : 'status-success'}" role="${this._status.isError ? 'alert' : 'status'}" aria-live="polite">${this._escapeHtml(this._status.text)}</span>`
+      : '';
     this.shadowRoot.innerHTML = `
       <style>
         :host {
@@ -398,7 +402,7 @@ class TtsSpeakerCard extends HTMLElement {
         }
         .row {
           display: grid;
-          grid-template-columns: 1fr auto auto;
+          grid-template-columns: minmax(0, 1fr) auto;
           gap: 10px;
           align-items: end;
         }
@@ -484,12 +488,35 @@ class TtsSpeakerCard extends HTMLElement {
           align-items: center;
           gap: 10px;
           margin-top: 10px;
+          position: relative;
           user-select: none;
         }
         .checkbox-row input {
           width: 18px;
           height: 18px;
           margin: 0;
+        }
+        .status {
+          color: var(--primary-text-color, #111);
+          font-size: 0.92rem;
+          line-height: 1.4;
+        }
+        .checkbox-row .status {
+          position: absolute;
+          top: 50%;
+          right: 0;
+          max-width: 50%;
+          overflow: hidden;
+          text-align: right;
+          text-overflow: ellipsis;
+          transform: translateY(-50%);
+          white-space: nowrap;
+        }
+        .status-error {
+          color: var(--error-color, #d32f2f);
+        }
+        .status-success {
+          color: var(--success-color, #2e7d32);
         }
         .hint, .empty {
           margin-top: 8px;
@@ -505,23 +532,15 @@ class TtsSpeakerCard extends HTMLElement {
           color: var(--error-color, #d32f2f);
           font-size: 0.92rem;
         }
-        .success {
-          margin-top: 10px;
-          padding: 10px 12px;
-          border-radius: 12px;
-          background: rgba(46, 125, 50, 0.1);
-          color: var(--success-color, #2e7d32);
-          font-size: 0.92rem;
-        }
         .split {
           display: grid;
           gap: 12px;
         }
         @media (max-width: 640px) {
           .row {
-            grid-template-columns: 1fr;
+            grid-template-columns: minmax(0, 1fr) auto;
           }
-          .send-btn, .clear-btn {
+          .send-btn {
             width: 100%;
           }
         }
@@ -552,16 +571,15 @@ class TtsSpeakerCard extends HTMLElement {
             <textarea id="ttsText" placeholder="${this._escapeHtml(this._config.message_placeholder)}"></textarea>
             <div class="checkbox-row">
               <input id="memorizeCheckbox" type="checkbox" ${existingMemorize ? 'checked' : ''} ${historyEnabled ? '' : 'disabled'} />
-              <label for="memorizeCheckbox">${this._escapeHtml(this._config.history_checkbox_label || 'Mémoriser le message')}</label>
+              <label for="memorizeCheckbox">${this._escapeHtml(this._config.history_checkbox_label || 'Historiser')}</label>
+              ${statusMarkup}
             </div>
           </div>
           <div class="section row">
             <button class="send-btn" id="sendBtn" type="button" ${this._isSending ? 'disabled aria-busy="true"' : ''}>${this._escapeHtml(this._config.send_label)}</button>
             <button class="clear-btn" id="clearBtn" type="button">${this._escapeHtml(this._config.clear_label)}</button>
-            <div></div>
           </div>
           `}
-          ${this._status.text ? `<div class="section ${this._status.isError ? 'error' : 'success'}" role="${this._status.isError ? 'alert' : 'status'}" aria-live="polite">${this._escapeHtml(this._status.text)}</div>` : ''}
           ${presetsOnly && !hasPresets ? '<div class="error" role="alert">Aucun preset n’est configuré.</div>' : ''}
           ${hasPresets ? `
             <div class="section">
@@ -571,6 +589,7 @@ class TtsSpeakerCard extends HTMLElement {
               </div>
             </div>
           ` : ''}
+          ${presetsOnly ? statusMarkup : ''}
           ${historyEnabled ? `
             <div class="section">
               <label class="label">${this._escapeHtml(this._config.history_label || 'Historique')}</label>
@@ -694,23 +713,23 @@ class TtsSpeakerCard extends HTMLElement {
     if (this._isSending) return;
     const cleanedText = String(text || '').trim();
     if (!cleanedText) {
-      this._setStatus('Le texte est vide.');
+      this._setStatus('Le texte est vide');
       return;
     }
     const speakers = this._getSpeakers();
     if (speakers.length === 0) {
-      this._setStatus('Aucune enceinte n’est configurée.');
+      this._setStatus('Aucune enceinte n’est configurée');
       return;
     }
     const selectedSpeaker = this._getSelectedSpeaker();
     const speaker = speakers.find((item) => item.entity_id.trim() === selectedSpeaker);
     const speakerEntityId = speaker?.entity_id.trim();
     if (!speakerEntityId) {
-      this._setStatus('L’enceinte sélectionnée n’est pas valide.');
+      this._setStatus('L’enceinte sélectionnée n’est pas valide');
       return;
     }
     if (!this._hass || typeof this._hass.callService !== 'function') {
-      this._setStatus('Home Assistant n’est pas encore prêt. Réessaie dans un instant.');
+      this._setStatus('Home Assistant n’est pas encore prêt. Réessaie dans un instant');
       return;
     }
     this._isSending = true;
@@ -729,7 +748,7 @@ class TtsSpeakerCard extends HTMLElement {
       if (isModernTtsService) {
         const ttsEntityId = this._getTtsEntityId();
         if (!ttsEntityId) {
-          throw new Error('Aucune entité TTS n’est configurée ou disponible dans Home Assistant.');
+          throw new Error('Aucune entité TTS n’est configurée ou disponible dans Home Assistant');
         }
         payload.media_player_entity_id = speakerEntityId;
         target = { entity_id: ttsEntityId };
@@ -746,7 +765,7 @@ class TtsSpeakerCard extends HTMLElement {
       if (this._config.clear_after_send) {
         this._setTextValue('');
       }
-      this._setStatus(`Envoyé vers ${speaker.label || speakerEntityId}.`, false);
+      this._setStatus(`Envoyé vers ${speaker.label || speakerEntityId}`, false);
     } catch (err) {
       const message = err?.message || String(err) || 'Erreur inconnue';
       this._setStatus(`Erreur lors de l’envoi : ${message}`);
