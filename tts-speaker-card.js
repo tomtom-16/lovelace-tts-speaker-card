@@ -202,6 +202,8 @@ class TtsSpeakerCard extends HTMLElement {
     if (speakers.length === 1) return speakers[0].entity_id;
     const select = this.shadowRoot?.querySelector('#speakerSelect');
     if (select) return select.value || '';
+    const selectedButton = this.shadowRoot?.querySelector('.speaker-segment[aria-checked="true"]');
+    if (selectedButton) return selectedButton.getAttribute('data-speaker-id') || '';
     return this._selectedSpeaker || '';
   }
   _getTextValue() {
@@ -243,7 +245,12 @@ class TtsSpeakerCard extends HTMLElement {
     if (!this.shadowRoot || !this._config) return;
     // Sauvegarde de l'état courant avant le rerender
     const existingText = this.shadowRoot.querySelector('#ttsText')?.value ?? this._draftText ?? '';
-    const existingSpeaker = this.shadowRoot.querySelector('#speakerSelect')?.value ?? this._selectedSpeaker ?? '';
+    const existingSpeaker = this.shadowRoot
+      .querySelector('.speaker-segment[aria-checked="true"]')
+      ?.getAttribute('data-speaker-id')
+      ?? this.shadowRoot.querySelector('#speakerSelect')?.value
+      ?? this._selectedSpeaker
+      ?? '';
     const existingMemorize = this.shadowRoot.querySelector('#memorizeCheckbox')?.checked ?? this._memorizeMessage ?? true;
     const speakers = this._getSpeakers();
     const presets = Array.isArray(this._config.presets) ? this._config.presets : [];
@@ -254,10 +261,21 @@ class TtsSpeakerCard extends HTMLElement {
     const hasPresets = presets.length > 0;
     const hasHistory = historyEnabled && this._history.length > 0;
     const hasSelectedSpeaker = speakers.some((speaker) => speaker.entity_id.trim() === existingSpeaker);
-    const emptySpeakerOption = !this._config.auto_select_first_speaker
+    const useSegmentedControl = speakers.length >= 2 && speakers.length <= 4;
+    const speakerOptions = speakers
+      .map((speaker, index) => {
+        const entityId = speaker.entity_id.trim();
+        const label = speaker?.label || entityId || `Enceinte ${index + 1}`;
+        const shouldSelect =
+          (hasSelectedSpeaker && entityId === existingSpeaker) ||
+          (!hasSelectedSpeaker && this._config.auto_select_first_speaker && index === 0);
+        const isTabStop = shouldSelect || (!hasSelectedSpeaker && !this._config.auto_select_first_speaker && index === 0);
+        return `<button class="speaker-segment" type="button" role="radio" data-speaker-id="${this._escapeHtml(entityId)}" aria-checked="${shouldSelect}" tabindex="${isTabStop ? '0' : '-1'}">${this._escapeHtml(label)}</button>`;
+      })
+      .join('');
+    const speakerSelectOptions = (!this._config.auto_select_first_speaker
       ? '<option value="">Sélectionner une enceinte</option>'
-      : '';
-    const speakerOptions = emptySpeakerOption + speakers
+      : '') + speakers
       .map((speaker, index) => {
         const entityId = speaker.entity_id.trim();
         const label = speaker?.label || entityId || `Enceinte ${index + 1}`;
@@ -339,6 +357,40 @@ class TtsSpeakerCard extends HTMLElement {
           color: var(--primary-text-color, #111);
           padding: 12px;
           outline: none;
+        }
+        .segmented-control {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+          gap: 4px;
+          padding: 4px;
+          border: 1px solid var(--divider-color, rgba(127,127,127,0.25));
+          border-radius: 14px;
+          background: var(--secondary-background-color, rgba(127,127,127,0.12));
+        }
+        .speaker-segment {
+          min-width: 0;
+          min-height: 44px;
+          padding: 10px 12px;
+          border: 0;
+          border-radius: 10px;
+          background: transparent;
+          color: var(--primary-text-color, #111);
+          cursor: pointer;
+          font-weight: 600;
+          overflow-wrap: anywhere;
+          transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+        }
+        .speaker-segment:hover {
+          background: color-mix(in srgb, var(--primary-color, #03a9f4) 12%, transparent);
+        }
+        .speaker-segment[aria-checked="true"] {
+          background: var(--primary-color, #03a9f4);
+          color: var(--text-primary-color, #fff);
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+        }
+        .speaker-segment:focus-visible {
+          outline: 2px solid var(--primary-color, #03a9f4);
+          outline-offset: 2px;
         }
         textarea {
           resize: vertical;
@@ -485,10 +537,14 @@ class TtsSpeakerCard extends HTMLElement {
             <div class="error" role="alert">Aucune enceinte n’est configurée dans la carte.</div>
           ` : `
           ${speakers.length > 1 ? `<div class="section">
-            <label class="label" for="speakerSelect">${this._escapeHtml(this._config.speaker_label || 'Enceinte')}</label>
-            <select id="speakerSelect">
-              ${speakerOptions}
-            </select>
+            <div class="label" id="speakerLabel">${this._escapeHtml(this._config.speaker_label || 'Enceinte')}</div>
+            ${useSegmentedControl
+              ? `<div class="segmented-control" role="radiogroup" aria-labelledby="speakerLabel">
+                ${speakerOptions}
+              </div>`
+              : `<select id="speakerSelect" aria-labelledby="speakerLabel">
+                ${speakerSelectOptions}
+              </select>`}
           </div>` : ''}
           ${presetsOnly ? '' : `
           <div class="section">
@@ -526,6 +582,7 @@ class TtsSpeakerCard extends HTMLElement {
       </ha-card>
     `;
     const speakerSelect = this.shadowRoot.querySelector('#speakerSelect');
+    const speakerSegments = [...this.shadowRoot.querySelectorAll('.speaker-segment')];
     const textarea = this.shadowRoot.querySelector('#ttsText');
     const sendBtn = this.shadowRoot.querySelector('#sendBtn');
     const clearBtn = this.shadowRoot.querySelector('#clearBtn');
@@ -549,13 +606,42 @@ class TtsSpeakerCard extends HTMLElement {
       textarea.onkeypress = (ev) => ev.stopPropagation();
     }
     if (speakerSelect) {
-      if (hasSelectedSpeaker) {
-        speakerSelect.value = existingSpeaker;
-      }
-      this._selectedSpeaker = speakerSelect.value || existingSpeaker || '';
+      this._selectedSpeaker = speakerSelect.value || (hasSelectedSpeaker ? existingSpeaker : '');
       speakerSelect.onchange = (ev) => {
         this._selectedSpeaker = ev.target.value || '';
       };
+    } else if (speakerSegments.length > 0) {
+      const selectedSegment = speakerSegments.find((segment) => segment.getAttribute('aria-checked') === 'true');
+      this._selectedSpeaker = selectedSegment?.getAttribute('data-speaker-id') || (hasSelectedSpeaker ? existingSpeaker : '');
+      const selectSpeaker = (segment) => {
+        const speakerId = segment.getAttribute('data-speaker-id') || '';
+        speakerSegments.forEach((item) => {
+          const isSelected = item === segment;
+          item.setAttribute('aria-checked', String(isSelected));
+          item.setAttribute('tabindex', isSelected ? '0' : '-1');
+        });
+        this._selectedSpeaker = speakerId;
+      };
+      speakerSegments.forEach((segment, index) => {
+        segment.onclick = () => selectSpeaker(segment);
+        segment.onkeydown = (ev) => {
+          const direction = ev.key === 'ArrowRight' || ev.key === 'ArrowDown' ? 1
+            : ev.key === 'ArrowLeft' || ev.key === 'ArrowUp' ? -1
+              : ev.key === 'Home' ? -Infinity
+                : ev.key === 'End' ? Infinity
+                  : 0;
+          if (!direction) return;
+          ev.preventDefault();
+          const nextIndex = direction === -Infinity
+            ? 0
+            : direction === Infinity
+              ? speakerSegments.length - 1
+              : (index + direction + speakerSegments.length) % speakerSegments.length;
+          const nextSegment = speakerSegments[nextIndex];
+          selectSpeaker(nextSegment);
+          nextSegment.focus();
+        };
+      });
     }
     if (memorizeCheckbox) {
       this._memorizeMessage = Boolean(existingMemorize);

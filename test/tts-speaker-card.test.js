@@ -207,8 +207,9 @@ test('affiche une erreur et masque les contrôles sans enceinte', () => {
   assert.doesNotMatch(card.shadowRoot.innerHTML, /id="ttsText"/);
 });
 
-test('masque le sélecteur avec une enceinte et le conserve avec plusieurs', () => {
+test('adapte le sélecteur au nombre d’enceintes', () => {
   const singleSpeakerCard = createCard();
+  assert.doesNotMatch(singleSpeakerCard.shadowRoot.innerHTML, /class="segmented-control"/);
   assert.doesNotMatch(singleSpeakerCard.shadowRoot.innerHTML, /id="speakerSelect"/);
 
   const multipleSpeakersCard = createCard({
@@ -217,7 +218,33 @@ test('masque le sélecteur avec une enceinte et le conserve avec plusieurs', () 
       { entity_id: 'media_player.cuisine', label: 'Cuisine' },
     ],
   });
-  assert.match(multipleSpeakersCard.shadowRoot.innerHTML, /id="speakerSelect"/);
+  assert.match(multipleSpeakersCard.shadowRoot.innerHTML, /class="segmented-control"/);
+  assert.doesNotMatch(multipleSpeakersCard.shadowRoot.innerHTML, /id="speakerSelect"/);
+  assert.match(multipleSpeakersCard.shadowRoot.innerHTML, /role="radiogroup"/);
+  assert.match(multipleSpeakersCard.shadowRoot.innerHTML, /data-speaker-id="media_player\.salon" aria-checked="true"/);
+  assert.match(multipleSpeakersCard.shadowRoot.innerHTML, /data-speaker-id="media_player\.cuisine" aria-checked="false"/);
+
+  const fourSpeakersCard = createCard({
+    speakers: [
+      { entity_id: 'media_player.salon', label: 'Salon' },
+      { entity_id: 'media_player.cuisine', label: 'Cuisine' },
+      { entity_id: 'media_player.bureau', label: 'Bureau' },
+      { entity_id: 'media_player.chambre', label: 'Chambre' },
+    ],
+  });
+  assert.match(fourSpeakersCard.shadowRoot.innerHTML, /class="segmented-control"/);
+
+  const fiveSpeakersCard = createCard({
+    speakers: [
+      'media_player.salon',
+      'media_player.cuisine',
+      'media_player.bureau',
+      'media_player.chambre',
+      'media_player.jardin',
+    ],
+  });
+  assert.doesNotMatch(fiveSpeakersCard.shadowRoot.innerHTML, /class="segmented-control"/);
+  assert.match(fiveSpeakersCard.shadowRoot.innerHTML, /<select id="speakerSelect"/);
 });
 
 test('supprime l’espacement réservé au titre lorsque celui-ci est vide', () => {
