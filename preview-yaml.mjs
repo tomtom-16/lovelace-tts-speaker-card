@@ -24,6 +24,44 @@ const splitYamlKeyValue = (value) => {
   return null;
 };
 
+const splitFlowItems = (value) => {
+  const items = [];
+  let quote = '';
+  let depth = 0;
+  let start = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index];
+    if (character === '"' && quote !== "'") quote = quote === '"' ? '' : '"';
+    if (character === "'" && quote !== '"') quote = quote === "'" ? '' : "'";
+    if (!quote && (character === '[' || character === '{')) depth += 1;
+    if (!quote && (character === ']' || character === '}')) depth -= 1;
+    if (character === ',' && !quote && depth === 0) {
+      items.push(value.slice(start, index).trim());
+      start = index + 1;
+    }
+  }
+  const last = value.slice(start).trim();
+  if (last) items.push(last);
+  return items;
+};
+
+const parseFlowCollection = (value) => {
+  const opening = value[0];
+  const closing = opening === '[' ? ']' : '}';
+  if (!value.endsWith(closing)) throw new Error(`Valeur YAML invalide : ${value}`);
+  const body = value.slice(1, -1).trim();
+  if (!body) return opening === '[' ? [] : {};
+  if (opening === '[') return splitFlowItems(body).map((item) => parseYamlScalar(item));
+  return splitFlowItems(body).reduce((result, item) => {
+    const pair = splitYamlKeyValue(item) || item.match(/^([^:]+):\s*(.*)$/);
+    if (!pair || !pair[1]) throw new Error(`Objet YAML invalide : ${item}`);
+    const key = (Array.isArray(pair) ? pair[0] : pair[1]).trim().replace(/^['"]|['"]$/g, '');
+    const rawValue = Array.isArray(pair) ? pair[1] : pair[2];
+    result[key] = parseYamlScalar(rawValue);
+    return result;
+  }, {});
+};
+
 const parseYamlScalar = (value) => {
   const scalar = stripYamlComment(value).trim();
   if (!scalar) return null;
@@ -31,9 +69,9 @@ const parseYamlScalar = (value) => {
   if (scalar === 'true') return true;
   if (scalar === 'false') return false;
   if (/^-?(?:0|[1-9]\d*)(?:\.\d+)?$/.test(scalar)) return Number(scalar);
-  if (scalar.startsWith('[') || scalar.startsWith('{')) {
+  if ((scalar.startsWith('[') || scalar.startsWith('{')) && (scalar.endsWith(']') || scalar.endsWith('}'))) {
     try {
-      return JSON.parse(scalar);
+      return parseFlowCollection(scalar);
     } catch (_error) {
       throw new Error(`Valeur YAML invalide : ${scalar}`);
     }
@@ -53,11 +91,13 @@ const parseYamlScalar = (value) => {
 
 const yamlLines = (source) => source.split(/\r?\n/).map((raw, lineNumber) => {
   if (/\t/.test(raw)) throw new Error(`Les tabulations ne sont pas acceptées (ligne ${lineNumber + 1}).`);
+  const indent = raw.length - raw.trimStart().length;
   const content = stripYamlComment(raw.trimStart());
   if (!content.trim() || content.trim() === '---') return null;
   return {
     content: content.trim(),
-    indent: raw.length - raw.trimStart().length,
+    rawContent: raw.slice(indent).trimEnd(),
+    indent,
     lineNumber: lineNumber + 1,
   };
 }).filter(Boolean);
@@ -75,6 +115,17 @@ export const parseYaml = (source) => {
       : parseMap(start, indent);
   };
 
+  const parseBlockScalar = (start, parentIndent, folded) => {
+    const values = [];
+    let index = start;
+    while (index < lines.length && lines[index].indent > parentIndent) {
+      values.push(lines[index].rawContent);
+      index += 1;
+    }
+    const text = folded ? values.join(' ').trimEnd() : values.join('\n');
+    return [`${text}\n`, index];
+  };
+
   const parseMap = (start, indent, target = {}) => {
     let index = start;
     while (index < lines.length) {
@@ -88,7 +139,11 @@ export const parseYaml = (source) => {
       const [key, rawValue] = pair;
       index += 1;
       if (rawValue) {
-        target[key] = parseYamlScalar(rawValue);
+        if (/^[|>]([-+])?$/.test(rawValue)) {
+          [target[key], index] = parseBlockScalar(index, indent, rawValue.startsWith('>'));
+        } else {
+          target[key] = parseYamlScalar(rawValue);
+        }
         continue;
       }
       if (index < lines.length && lines[index].indent > indent) {
@@ -130,7 +185,11 @@ export const parseYaml = (source) => {
       const [key, rawValue] = firstPair;
       if (!key) throw new Error(`Clé YAML invalide (ligne ${line.lineNumber}).`);
       if (rawValue) {
-        item[key] = parseYamlScalar(rawValue);
+        if (/^[|>]([-+])?$/.test(rawValue)) {
+          [item[key], index] = parseBlockScalar(index, indent, rawValue.startsWith('>'));
+        } else {
+          item[key] = parseYamlScalar(rawValue);
+        }
       } else if (index < lines.length && lines[index].indent > indent) {
         [item[key], index] = parseBlock(index, lines[index].indent);
       } else {

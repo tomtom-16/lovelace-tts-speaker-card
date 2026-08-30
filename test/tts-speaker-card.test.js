@@ -52,6 +52,7 @@ const { TtsSpeakerCard } = await import('../tts-speaker-card.js');
 function createCard(config = {}) {
   const card = new TtsSpeakerCard();
   card.setConfig({
+    history: { enabled: true },
     speakers: [{ entity_id: 'media_player.salon', label: 'Salon' }],
     ...config,
   });
@@ -167,6 +168,17 @@ test('borne la taille de l’historique entre 1 et 100 entrées', () => {
   assert.equal(createCard({ history: { max_items: 0 } })._getHistoryLimit(), 1);
   assert.equal(createCard({ history: { max_items: 500 } })._getHistoryLimit(), 100);
   assert.equal(createCard({ history: { max_items: 'invalide' } })._getHistoryLimit(), 20);
+});
+
+test('désactive l’historique par défaut et isole sa clé par enceinte', () => {
+  const first = new TtsSpeakerCard();
+  first.setConfig({ speakers: [{ entity_id: 'media_player.salon' }] });
+  const second = new TtsSpeakerCard();
+  second.setConfig({ speakers: [{ entity_id: 'media_player.cuisine' }] });
+
+  assert.equal(first._config.history.enabled, false);
+  assert.notEqual(first._getStorageKey(), second._getStorageKey());
+  assert.equal(first._getStorageKey(), 'tts-speaker-card.history.media-player-salon');
 });
 
 test('refuse un nom de service mal formé', () => {
@@ -295,7 +307,7 @@ test('efface réellement le brouillon après un envoi réussi', async () => {
   assert.equal(card._draftText, '');
 });
 
-test('affiche Historiser et le statut sans fond à côté du libellé', async () => {
+test('affiche Historiser et réserve une ligne dédiée au statut', async () => {
   const card = createCard({
     tts_service: 'tts.google_translate_say',
   });
@@ -303,12 +315,11 @@ test('affiche Historiser et le statut sans fond à côté du libellé', async ()
 
   assert.match(card.shadowRoot.innerHTML, /<label for="memorizeCheckbox">Historiser<\/label>/);
   assert.doesNotMatch(card.shadowRoot.innerHTML, /Mémoriser le message/);
-  assert.match(card.shadowRoot.innerHTML, /grid-template-columns: minmax\(0, 1fr\) auto/);
-  assert.match(card.shadowRoot.innerHTML, /\.checkbox-row \.status \{[\s\S]*position: absolute;[\s\S]*right: 0;[\s\S]*text-align: right;/);
+  assert.match(card.shadowRoot.innerHTML, /\.status-container \{[\s\S]*grid-column: 1 \/ -1;[\s\S]*overflow-wrap: anywhere;/);
 
   await card._sendText('Bonjour');
 
-  assert.match(card.shadowRoot.innerHTML, /<label for="memorizeCheckbox">Historiser<\/label>\s*<span class="status status-success"/);
+  assert.match(card.shadowRoot.innerHTML, /<label for="memorizeCheckbox">Historiser<\/label>[\s\S]*<span class="status status-success"/);
   assert.match(card.shadowRoot.innerHTML, /Envoyé vers Salon/);
   assert.doesNotMatch(card._status.text, /\.$/);
   assert.doesNotMatch(card.shadowRoot.innerHTML, /<div class="section success"/);

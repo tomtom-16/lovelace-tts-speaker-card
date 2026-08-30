@@ -12,7 +12,7 @@
         --primary-text-color: #1f2937;
         --secondary-background-color: #e5e7eb;
         --divider-color: #d1d5db;
-        --primary-color: #03a9f4;
+        --primary-color: #0277bd;
         --text-primary-color: #fff;
         --error-color: #d32f2f;
         --success-color: #2e7d32;
@@ -172,7 +172,8 @@
         <h2>Configuration</h2>
         <p class="hint">
           Modifie le YAML : la carte centrale se met à jour dès que la configuration
-          est valide. La syntaxe habituelle de configuration Home Assistant est acceptée.
+          est valide. Le sous-ensemble YAML courant (mappings, listes, listes inline et blocs
+          multilignes) est accepté ; les ancres et aliases YAML ne sont pas pris en charge.
         </p>
         <textarea id="configEditor" spellcheck="false" aria-label="Configuration YAML"></textarea>
         <div class="toolbar">

@@ -1,11 +1,17 @@
 {
   "name": "lovelace-tts-speaker-card",
-  "version": "1.0.0",
+  "version": "0.2.3",
   "private": true,
   "type": "module",
   "scripts": {
     "check": "node --check tts-speaker-card.js",
     "test": "node --test",
     "preview": "node serve-preview.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "linkedom": "^0.18.13"
   }
 }

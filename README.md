@@ -14,7 +14,7 @@ Carte Lovelace pour envoyer rapidement un texte vers une enceinte Home Assistant
 - Compatibilité avec `tts.speak` et les anciens services TTS
 - Messages prédéfinis envoyés en un clic
 - Mode `presets_only` pour créer une carte composée uniquement de boutons
-- Historique local, dédupliqué et limité
+- Historique local optionnel, dédupliqué et limité
 - Raccourci `Ctrl+Entrée` ou `Cmd+Entrée`
 - Libellés, langue et données de service personnalisables
 - Préfixe TTS optionnel pour ajouter automatiquement une pause ou un texte avant chaque message
@@ -43,7 +43,7 @@ type: module
 
 Ajoute la carte depuis le sélecteur de cartes du tableau de bord, puis utilise l’onglet visuel. Le champ **Enceintes** est automatiquement alimenté avec les entités `media_player` disponibles dans Home Assistant. L’éditeur permet aussi de régler la langue, les presets, l’historique et le mode presets uniquement.
 
-La configuration YAML reste disponible pour les usages avancés. Les paramètres techniques `tts_service`, `tts_entity_id` et `tts_prefix`, ainsi que les options de personnalisation `message_placeholder`, `history_checkbox_label` et `history.storage_key`, sont volontairement disponibles uniquement dans l’éditeur YAML.
+La configuration YAML reste disponible pour les usages avancés. Les paramètres techniques `tts_service`, `tts_entity_id` et `tts_prefix`, ainsi que les options de personnalisation `message_placeholder`, `history_checkbox_label` et `history.storage_key`, sont volontairement disponibles uniquement dans l’éditeur YAML. Lorsque plusieurs entités TTS sont disponibles, l’éditeur visuel propose aussi le choix de l’entité utilisée par `tts.speak`.
 
 ## Configuration recommandée
 
@@ -116,6 +116,10 @@ Dans ce mode, `tts_entity_id` n’est pas utilisé.
 | `speakers` | `[]` | Liste des sorties `{ entity_id, label }` |
 | `presets` | `[]` | Liste des messages `{ label, text }` |
 | `presets_only` | `false` | Masque la saisie et l’historique pour n’afficher que les presets |
+| `history.enabled` | `false` | Active l’historique local (opt-in) |
+| `history.max_items` | `20` | Nombre maximal d’entrées, borné entre 1 et 100 |
+| `history.allow_delete` | `true` | Affiche les boutons de suppression |
+| `history.storage_key` | automatique | Clé explicite pour séparer ou partager un historique |
 | `service_data` | `{}` | Données supplémentaires transmises à l’action |
 | `clear_after_send` | `true` | Efface le texte après un envoi réussi |
 | `auto_select_first_speaker` | `true` | Sélectionne automatiquement la première enceinte |
@@ -146,7 +150,7 @@ Le champ texte, les boutons d’envoi/effacement et l’historique sont alors ma
 
 ### Historique
 
-L’historique est stocké dans le navigateur, pas dans Home Assistant. `max_items` est borné entre 1 et 100.
+L’historique est désactivé par défaut et, lorsqu’il est activé, il est stocké dans le navigateur, pas dans Home Assistant. `max_items` est borné entre 1 et 100. Sans `storage_key`, la clé est dérivée du titre et des enceintes configurées afin d’éviter le partage accidentel entre cartes. Utilise une même `storage_key` uniquement pour partager volontairement un historique.
 
 ```yaml
 history:
@@ -164,7 +168,7 @@ history:
 
 ## Développement
 
-Le projet n’a aucune dépendance d’exécution. Node.js 22 ou plus récent suffit pour lancer les vérifications :
+Le projet n’a aucune dépendance d’exécution. Les tests utilisent une dépendance de développement DOM. Node.js 24 ou plus récent suffit pour lancer les vérifications :
 
 ```bash
 npm test
