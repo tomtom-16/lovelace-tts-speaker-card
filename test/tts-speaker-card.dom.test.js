@@ -104,3 +104,27 @@ test('nomme les switches de l’éditeur pour les lecteurs d’écran', () => {
   assert.equal(editor.shadowRoot.querySelector('#presetsOnly').getAttribute('aria-labelledby'), 'presetsOnlyLabel');
   assert.equal(editor.shadowRoot.querySelector('#historyEnabled').getAttribute('aria-labelledby'), 'historyEnabledLabel');
 });
+
+test('émet la nouvelle configuration dès la saisie dans un champ texte', () => {
+  const editor = new TtsSpeakerCardEditor();
+  editor.setConfig({ speakers: ['media_player.salon'] });
+  document.body.appendChild(editor);
+
+  let changedConfig;
+  editor.addEventListener('config-changed', (event) => {
+    changedConfig = event.detail.config;
+  });
+
+  const title = editor.shadowRoot.querySelector('#title');
+  title.value = 'Titre de test';
+  title.dispatchEvent(new window.Event('input', { bubbles: true }));
+
+  assert.equal(changedConfig.title, 'Titre de test');
+});
+
+test('garde l’indicateur de focus dans les limites de l’éditeur', () => {
+  const editor = new TtsSpeakerCardEditor();
+  editor.setConfig({ speakers: ['media_player.salon'] });
+
+  assert.match(editor.shadowRoot.querySelector('style').textContent, /outline-offset:\s*-2px/);
+});

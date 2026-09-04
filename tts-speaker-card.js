@@ -614,13 +614,13 @@ class TtsSpeakerCard extends HTMLElement {
           line-height: 1;
         }
         .checkbox-row {
-          display: flex;
+          display: grid;
+          grid-template-columns: auto auto minmax(0, 1fr);
           align-items: center;
           gap: 10px;
           margin-top: 10px;
+          min-height: 1.4em;
           user-select: none;
-          display: grid;
-          grid-template-columns: auto minmax(0, 1fr);
         }
         .checkbox-row input {
           width: 18px;
@@ -633,9 +633,18 @@ class TtsSpeakerCard extends HTMLElement {
           line-height: 1.4;
         }
         .status-container {
-          grid-column: 1 / -1;
           min-height: 0;
+          min-width: 0;
           overflow-wrap: anywhere;
+          text-align: right;
+        }
+        .checkbox-row.has-history .status-container {
+          grid-column: 3;
+          justify-self: end;
+        }
+        .checkbox-row.status-only .status-container {
+          grid-column: 1 / -1;
+          justify-self: end;
         }
         .storage-warning {
           color: var(--warning-color, #8a5700);
@@ -705,7 +714,7 @@ class TtsSpeakerCard extends HTMLElement {
           <div class="section">
             <label class="label" for="ttsText">Texte</label>
             <textarea id="ttsText" placeholder="${this._escapeHtml(this._config.message_placeholder)}"></textarea>
-            <div class="checkbox-row">
+            <div class="checkbox-row ${historyEnabled ? 'has-history' : 'status-only'}">
               ${historyEnabled ? `<input id="memorizeCheckbox" type="checkbox" ${existingMemorize ? 'checked' : ''} ${this._isSending ? 'disabled' : ''} />
               <label for="memorizeCheckbox">${this._escapeHtml(this._config.history_checkbox_label || 'Historiser')}</label>` : ''}
               <div id="statusContainer" class="status-container">${statusMarkup}</div>
@@ -1025,7 +1034,8 @@ class TtsSpeakerCardEditor extends HTMLElement {
         }
         input:focus-visible, textarea:focus-visible, button:focus-visible, ha-selector:focus-visible, ha-switch:focus-visible {
           outline: 2px solid var(--primary-color, #0277bd);
-          outline-offset: 2px;
+          /* Keep the focus indicator inside the card, whose overflow may clip it. */
+          outline-offset: -2px;
         }
         textarea {
           resize: vertical;
@@ -1175,7 +1185,7 @@ class TtsSpeakerCardEditor extends HTMLElement {
       const field = this.shadowRoot.querySelector(`#${id}`);
       if (!field) return;
       field.value = this._config[configKey] ?? fallback;
-      field.addEventListener('change', (ev) => this._patch({ [configKey]: ev.target.value }));
+      field.addEventListener('input', (ev) => this._patch({ [configKey]: ev.target.value }));
     };
     setField('title', 'title');
     setField('language', 'language');
@@ -1183,7 +1193,7 @@ class TtsSpeakerCardEditor extends HTMLElement {
     const historyMaxItems = this.shadowRoot.querySelector('#historyMaxItems');
     if (historyMaxItems) {
       historyMaxItems.value = this._config.history.max_items;
-      historyMaxItems.addEventListener('change', (ev) => {
+      historyMaxItems.addEventListener('input', (ev) => {
         const value = Math.min(100, Math.max(1, Number(ev.target.value) || DEFAULT_CONFIG.history.max_items));
         this._patch({ history: { ...this._config.history, max_items: value } });
       });
@@ -1245,7 +1255,7 @@ class TtsSpeakerCardEditor extends HTMLElement {
     this.shadowRoot.querySelectorAll('[data-speaker-label]').forEach((field) => {
       const index = Number(field.getAttribute('data-speaker-label'));
       field.value = speakers[index]?.label || '';
-      field.addEventListener('change', (ev) => {
+      field.addEventListener('input', (ev) => {
         const nextSpeakers = speakers.map((speaker, speakerIndex) => (
           speakerIndex === index ? { ...speaker, label: ev.target.value } : speaker
         ));
@@ -1256,7 +1266,7 @@ class TtsSpeakerCardEditor extends HTMLElement {
     this.shadowRoot.querySelectorAll('[data-preset-label]').forEach((field) => {
       const index = Number(field.getAttribute('data-preset-label'));
       field.value = presets[index]?.label || '';
-      field.addEventListener('change', (ev) => {
+      field.addEventListener('input', (ev) => {
         const nextPresets = presets.map((preset, presetIndex) => (
           presetIndex === index ? { ...preset, label: ev.target.value } : preset
         ));
@@ -1266,7 +1276,7 @@ class TtsSpeakerCardEditor extends HTMLElement {
     this.shadowRoot.querySelectorAll('[data-preset-text]').forEach((field) => {
       const index = Number(field.getAttribute('data-preset-text'));
       field.value = presets[index]?.text || '';
-      field.addEventListener('change', (ev) => {
+      field.addEventListener('input', (ev) => {
         const nextPresets = presets.map((preset, presetIndex) => (
           presetIndex === index ? { ...preset, text: ev.target.value } : preset
         ));

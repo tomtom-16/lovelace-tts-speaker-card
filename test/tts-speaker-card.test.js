@@ -307,7 +307,7 @@ test('efface réellement le brouillon après un envoi réussi', async () => {
   assert.equal(card._draftText, '');
 });
 
-test('affiche Historiser et réserve une ligne dédiée au statut', async () => {
+test('affiche Historiser et aligne le statut à droite sur la même ligne', async () => {
   const card = createCard({
     tts_service: 'tts.google_translate_say',
   });
@@ -315,7 +315,9 @@ test('affiche Historiser et réserve une ligne dédiée au statut', async () => 
 
   assert.match(card.shadowRoot.innerHTML, /<label for="memorizeCheckbox">Historiser<\/label>/);
   assert.doesNotMatch(card.shadowRoot.innerHTML, /Mémoriser le message/);
-  assert.match(card.shadowRoot.innerHTML, /\.status-container \{[\s\S]*grid-column: 1 \/ -1;[\s\S]*overflow-wrap: anywhere;/);
+  assert.match(card.shadowRoot.innerHTML, /\.checkbox-row \{[\s\S]*grid-template-columns: auto auto minmax\(0, 1fr\);/);
+  assert.match(card.shadowRoot.innerHTML, /\.checkbox-row \{[\s\S]*min-height: 1\.4em;/);
+  assert.match(card.shadowRoot.innerHTML, /\.checkbox-row\.has-history \.status-container \{[\s\S]*grid-column: 3;/);
 
   await card._sendText('Bonjour');
 
