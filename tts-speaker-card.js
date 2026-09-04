@@ -920,6 +920,11 @@ class TtsSpeakerCardEditor extends HTMLElement {
     this._config = null;
     this._hass = null;
     this._ttsEntityCount = 0;
+    ['keydown', 'keyup', 'keypress'].forEach((eventName) => {
+      this.shadowRoot.addEventListener(eventName, (ev) => {
+        if (ev.target?.matches?.('input, textarea')) ev.stopPropagation();
+      }, true);
+    });
   }
 
   setConfig(config) {
@@ -964,14 +969,14 @@ class TtsSpeakerCardEditor extends HTMLElement {
     });
     this.dispatchEvent(event);
     if (focusAttribute) {
-      queueMicrotask(() => {
+      setTimeout(() => {
         const field = this.shadowRoot.querySelector(`[${focusAttribute}="${focusValue}"]`);
         if (!field) return;
         field.focus();
         if (typeof selectionStart === 'number' && typeof field.setSelectionRange === 'function') {
           field.setSelectionRange(selectionStart, selectionEnd);
         }
-      });
+      }, 0);
     }
   }
 
