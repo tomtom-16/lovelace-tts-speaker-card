@@ -1181,6 +1181,12 @@ class TtsSpeakerCardEditor extends HTMLElement {
       </div>
     `;
 
+    this.shadowRoot.querySelectorAll('input, textarea').forEach((field) => {
+      field.onkeydown = (ev) => ev.stopPropagation();
+      field.onkeyup = (ev) => ev.stopPropagation();
+      field.onkeypress = (ev) => ev.stopPropagation();
+    });
+
     const setField = (id, configKey, fallback = '') => {
       const field = this.shadowRoot.querySelector(`#${id}`);
       if (!field) return;
