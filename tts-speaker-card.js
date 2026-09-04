@@ -950,6 +950,12 @@ class TtsSpeakerCardEditor extends HTMLElement {
   }
 
   _emitConfig(config) {
+    const activeField = this.shadowRoot?.activeElement;
+    const focusAttribute = activeField && ['id', 'data-speaker-label', 'data-preset-label', 'data-preset-text']
+      .find((attribute) => activeField.matches?.(`input, textarea`) && activeField.hasAttribute(attribute));
+    const focusValue = focusAttribute ? activeField.getAttribute(focusAttribute) : '';
+    const selectionStart = activeField?.selectionStart;
+    const selectionEnd = activeField?.selectionEnd;
     this._config = normalizeConfig(config, { preserveIncompletePresets: true });
     const event = new CustomEvent('config-changed', {
       bubbles: true,
@@ -957,6 +963,16 @@ class TtsSpeakerCardEditor extends HTMLElement {
       detail: { config: this._config },
     });
     this.dispatchEvent(event);
+    if (focusAttribute) {
+      queueMicrotask(() => {
+        const field = this.shadowRoot.querySelector(`[${focusAttribute}="${focusValue}"]`);
+        if (!field) return;
+        field.focus();
+        if (typeof selectionStart === 'number' && typeof field.setSelectionRange === 'function') {
+          field.setSelectionRange(selectionStart, selectionEnd);
+        }
+      });
+    }
   }
 
   _patch(patch, rerender = false) {
